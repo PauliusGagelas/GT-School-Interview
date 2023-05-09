@@ -54,6 +54,12 @@ public class JengaGame : MonoBehaviour
         AddListeners();
     }
 
+    private void OnDestroy() {
+        RemoveListeners();
+    }
+
+    #region Button Logic
+
     private void AddListeners() {
         _toggleGravityButton.onClick.AddListener(OnGravityPressed);
         _testMyStackButton.onClick.AddListener(OnTestMyStackPressed);
@@ -100,15 +106,12 @@ public class JengaGame : MonoBehaviour
         _gravityOn = false;
         ProcessData();
     }
+    #endregion
 
     private void DestroyAllChildren() {
         foreach (Transform child in transform) {
             GameObject.Destroy(child.gameObject);
         }
-    }
-
-    private void OnDestroy() {
-        RemoveListeners();
     }
 
     private void ProcessData() {
@@ -121,7 +124,7 @@ public class JengaGame : MonoBehaviour
         }
     }
 
-    IEnumerator GetRequest(string uri, Action<string> callback) {
+    private IEnumerator GetRequest(string uri, Action<string> callback) {
         using (UnityWebRequest webRequest = UnityWebRequest.Get(uri)) {
             // Request and wait for the desired page.
             yield return webRequest.SendWebRequest();
@@ -158,8 +161,8 @@ public class JengaGame : MonoBehaviour
 
         List<DataObject> orderedDataObjects;
 
-        foreach (string grade in extractedGrades.Keys.ToList()) {
-            // For each stack order it correctly
+        // For each stack order it correctly
+        foreach (string grade in extractedGrades.Keys.ToList()) {           
             orderedDataObjects = extractedGrades[grade].OrderBy(x => x.domain).ThenBy(x => x.cluster).ThenBy(x => x.standardid).ToList();
             extractedGrades[grade] = orderedDataObjects;
         }
@@ -168,78 +171,96 @@ public class JengaGame : MonoBehaviour
 
         int stackIndex = 0;
         foreach (string grade in extractedGrades.Keys) {
-            int rowIndex = 0;
-            int heightIndex = 0;
-            // Render the stack            
-            int currentIndex = 0;
-
-            bool firstRowPassed = false;
-            GameObject rowParent = null;
-
-            // Make parents for each key
-            GameObject stackParent = new GameObject();
-            stackParent.transform.parent = gameObject.transform;
-            stackParent.transform.name = grade;
-
-            Vector3 offSet = stackIndex * _stackOffset + _stackInitialPosition; // Add initial stack offset
-            Vector3 currentMiddlePosition = offSet;
-
-            stackParent.transform.position = stackIndex * _stackOffset + _stackInitialPosition;
-
-            // Make world Space Text field
-            GameObject stackTextParent = new GameObject();
-            stackTextParent.transform.parent = stackParent.transform;
-            stackTextParent.transform.name = grade + " Text";
-            stackTextParent.transform.localPosition = _stackNameOffset;
-            stackTextParent.transform.localScale = _stackNameScale;
-            TextMesh textMesh = stackTextParent.AddComponent<TextMesh>();
-            textMesh.text = grade;
-            textMesh.anchor = TextAnchor.MiddleCenter;
-
-            for (int i = 0; i < extractedGrades[grade].Count; i++) {
-                offSet = stackIndex * _stackOffset + _stackInitialPosition; // Add initial stack offset
-                // Time to increase 
-                if (!firstRowPassed || currentIndex >= _amountPerRow) {
-                    if (rowParent != null && heightIndex % 2 == 0) {
-                        rowParent.transform.localEulerAngles = new Vector3(rowParent.transform.localEulerAngles.x, rowParent.transform.localEulerAngles.y + 90, rowParent.transform.localEulerAngles.z);
-                    }
-                    rowParent = new GameObject();
-                    rowParent.transform.parent = stackParent.transform;
-                    rowParent.transform.name = "Height: " + heightIndex;
-                    currentMiddlePosition = offSet;
-                    currentMiddlePosition.x += _horizontalOffset;
-                    currentMiddlePosition.y += _verticalOffset * heightIndex;
-
-                    rowParent.transform.position = currentMiddlePosition;
-
-                    currentIndex = 0;
-                    rowIndex = 0;
-
-                    if (firstRowPassed)
-                        heightIndex++;
-                    firstRowPassed = true;
-                }
-
-                offSet.x += rowIndex * _horizontalOffset;
-                offSet.y += heightIndex * _verticalOffset;
-                GameObject jengaBlock = Instantiate(_jengaBlockPrefab);
-                jengaBlock.transform.position = offSet;
-                jengaBlock.transform.parent = rowParent.transform;
-
-                // Assign the correct type of jenga block
-                JengaPiece jengaPiece = jengaBlock.GetComponentInChildren<JengaPiece>();
-                DataObject data = extractedGrades[grade][i];
-                jengaPiece.SetData(data);
-                extractedGrades[grade][i].objectReference = jengaPiece;
-
-
-                rowIndex++;
-                currentIndex++;
-            }
+            RenderGrade(extractedGrades[grade], grade, stackIndex);
             stackIndex++;
         }
     }
 
+    private void RenderGrade(List<DataObject> dataObjects, string grade, int stackIndex) {
+        int rowIndex = 0;
+        int heightIndex = 0;
+        // Render the stack            
+        int currentIndex = 0;
+
+        bool firstRowPassed = false;
+        GameObject rowParent = null;
+
+        // Make parents for each key
+        GameObject stackParent = new GameObject();
+        stackParent.transform.parent = gameObject.transform;
+        stackParent.transform.name = grade;
+        Vector3 offSet = stackIndex * _stackOffset + _stackInitialPosition; // Add initial stack offset
+        Vector3 currentMiddlePosition = offSet;
+        stackParent.transform.position = stackIndex * _stackOffset + _stackInitialPosition;
+
+        // Make world Space Text field
+        MakeGradeTitle(grade, stackParent.transform);
+        
+        for (int i = 0; i < dataObjects.Count; i++) {
+            offSet = stackIndex * _stackOffset + _stackInitialPosition; // Add initial stack offset
+                                                                        // Time to increase 
+            if (!firstRowPassed || currentIndex >= _amountPerRow) {
+                #region Make new Row Parent
+                if (rowParent != null && heightIndex % 2 == 0) {
+                    rowParent.transform.localEulerAngles = new Vector3(rowParent.transform.localEulerAngles.x, rowParent.transform.localEulerAngles.y + 90, rowParent.transform.localEulerAngles.z);
+                }
+                rowParent = new GameObject();
+                rowParent.transform.parent = stackParent.transform;
+                rowParent.transform.name = "Height: " + heightIndex;
+                currentMiddlePosition = offSet;
+                currentMiddlePosition.x += _horizontalOffset;
+                currentMiddlePosition.y += _verticalOffset * heightIndex;
+                rowParent.transform.position = currentMiddlePosition;
+                #endregion
+
+                currentIndex = 0;
+                rowIndex = 0;
+
+                if (firstRowPassed)
+                    heightIndex++;
+                firstRowPassed = true;
+            }
+
+            DataObject dataObject = dataObjects[i];
+            RenderJengaBlock(offSet, rowIndex, heightIndex, rowParent.transform, ref dataObject);
+            dataObjects[i] = dataObject;
+
+            rowIndex++;
+            currentIndex++;
+        }
+    }
+
+    private void RenderJengaBlock(Vector3 offSet, int rowIndex, int heightIndex, Transform parentTransform, ref DataObject dataObject) {
+        offSet.x += rowIndex * _horizontalOffset;
+        offSet.y += heightIndex * _verticalOffset;
+        GameObject jengaBlock = Instantiate(_jengaBlockPrefab);
+        jengaBlock.transform.position = offSet;
+        jengaBlock.transform.parent = parentTransform.transform;
+
+        // Assign the correct type of jenga block
+        JengaPiece jengaPiece = jengaBlock.GetComponentInChildren<JengaPiece>();
+        DataObject data = dataObject;
+        jengaPiece.SetData(data);
+        dataObject.objectReference = jengaPiece;
+    }
+
+    private void MakeGradeTitle(string title, Transform parent) {
+        GameObject stackTextParent = new GameObject();
+        stackTextParent.transform.parent = parent.transform;
+        stackTextParent.transform.name = title + " Text";
+        stackTextParent.transform.localPosition = _stackNameOffset;
+        stackTextParent.transform.localScale = _stackNameScale;
+        TextMesh textMesh = stackTextParent.AddComponent<TextMesh>();
+        textMesh.text = title;
+        textMesh.anchor = TextAnchor.MiddleCenter;
+    }
+
+    /// <summary>
+    /// Method used for extracting all the Grades
+    /// </summary>
+    /// <param name="keyToExtract"></param>
+    /// <param name="rootObject"></param>
+    /// <returns></returns>
     private Dictionary<string, List<DataObject>> ExtractProperty(string keyToExtract, RootObject rootObject) {
         Dictionary<string, List<DataObject>> extractedProperties = new Dictionary<string, List<DataObject>>();
 

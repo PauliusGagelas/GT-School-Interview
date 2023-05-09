@@ -5,6 +5,7 @@ using UnityEngine;
 
 public class JengaPiece : MonoBehaviour
 {
+    #region Fields
     [Header("Jenga Materials")]
     [SerializeField]
     private Material _glassMaterial;
@@ -43,6 +44,7 @@ public class JengaPiece : MonoBehaviour
         {1, JengaType.Wood },
         {2, JengaType.Stone }
     };
+    #endregion
 
     private void Awake() {
         OnJengaTypeChanged(_type);
@@ -61,9 +63,7 @@ public class JengaPiece : MonoBehaviour
     }
 
     public void OnJengaTypeChanged(int masteryValue) {
-        masteryDictionary.TryGetValue(masteryValue, out JengaType value);
-
-        if (value != null) {
+        if (masteryDictionary.TryGetValue(masteryValue, out JengaType value)) {
             OnJengaTypeChanged(masteryDictionary[masteryValue]);
         } else {
             Debug.LogError("Unsupported mastery value detected! " + masteryValue);
